@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 
 struct MainTabView: View {
@@ -25,9 +23,9 @@ struct MainTabView: View {
                 }
                 .tag(2)
             
-            SafetyInfoView()
+            SettingsView()
                 .tabItem {
-                    Label("Safety", systemImage: "heart.fill")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
                 .tag(3)
         }
