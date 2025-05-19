@@ -82,7 +82,7 @@ struct LogEntryView: View {
                     }
                 }
                 
-                Section(header: Text("MDMA Effects")) {
+                Section(header: Text("Molly Effects")) {
                     ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
                         Button(action: {
                             if selectedSymptoms.contains(symptom) {
@@ -143,11 +143,11 @@ struct LogEntryView: View {
                 .listRowInsets(EdgeInsets())
                 .padding()
             }
-            .navigationTitle("Log MDMA Use")
+            .navigationTitle("Log Molly Use")
             .alert("Saved!", isPresented: $showingAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Your MDMA usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
+                Text("Your Molly usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
             }
         }
     }

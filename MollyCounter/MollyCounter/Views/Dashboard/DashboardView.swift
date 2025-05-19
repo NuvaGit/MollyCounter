@@ -8,10 +8,9 @@ struct DashboardView: View {
     @State private var animateCards = false
     @State private var timeNow = Date()
     @State private var pulseSize: CGFloat = 1.0
-    @State private var heartbeatPulse: CGFloat = 1.0
+    @State private var heartbeatSize: CGFloat = 1.0
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    let heartbeatTimer = Timer.publish(every: 0.85, on: .main, in: .common).autoconnect() // Simulated heartbeat
     
     var body: some View {
         NavigationView {
@@ -114,26 +113,84 @@ struct DashboardView: View {
                 animateCards = true
             }
             
-            // Start breathing animation
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                pulseSize = 1.05
-            }
+            startAnimations()
         }
         .onReceive(timer) { _ in
             timeNow = Date()
         }
-        .onReceive(heartbeatTimer) { _ in
-            // Simulate heartbeat animation
+    }
+    
+    // MARK: - Animation Control
+    
+    private func startAnimations() {
+        let phase = getCurrentPhaseString()
+        let pulseDuration = getPulseDuration(for: phase)
+        let heartbeatInterval = getHeartbeatInterval(for: phase)
+        
+        // Start breathing animation - bigger more visible effect
+        withAnimation(Animation.easeInOut(duration: pulseDuration).repeatForever(autoreverses: true)) {
+            pulseSize = 1.1 // Very noticeable pulse
+        }
+        
+        // Start heartbeat animation - run it in a loop
+        func animateHeartbeat() {
+            // Expand quickly
             withAnimation(.easeOut(duration: 0.2)) {
-                heartbeatPulse = 1.06
+                heartbeatSize = 1.1
             }
             
-            // Return to normal size with subtle delay
+            // Contract more slowly
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 withAnimation(.easeIn(duration: 0.4)) {
-                    heartbeatPulse = 1.0
+                    heartbeatSize = 1.0
+                }
+                
+                // Schedule next heartbeat
+                DispatchQueue.main.asyncAfter(deadline: .now() + heartbeatInterval) {
+                    animateHeartbeat()
                 }
             }
+        }
+        
+        // Start the heartbeat loop
+        animateHeartbeat()
+    }
+    
+    // Helper function to get current phase name
+    private func getCurrentPhaseString() -> String? {
+        guard let lastDosage = dosageStore.dosages.last,
+              isRecentDosage() else {
+            return nil
+        }
+        
+        let minutesSince = Int(timeNow.timeIntervalSince(lastDosage.date) / 60)
+        let phase = getCurrentPhase(minutesSince: minutesSince)
+        return phase?.name
+    }
+    
+    // Get pulse duration based on MDMA phase
+    private func getPulseDuration(for phase: String?) -> Double {
+        switch phase {
+        case "Peak": return 0.8     // Fast, energetic
+        case "Come-up": return 1.2   // Medium-fast
+        case "Plateau": return 1.5   // Medium
+        case "Come-down": return 2.0 // Slower
+        case "After-effects": return 3.0 // Very slow
+        case "Onset": return 1.8     // Slightly elevated
+        default: return 3.0          // Normal/slow
+        }
+    }
+    
+    // Get heartbeat interval based on MDMA phase
+    private func getHeartbeatInterval(for phase: String?) -> Double {
+        switch phase {
+        case "Peak": return 0.6      // Rapid heartbeat
+        case "Come-up": return 0.8   // Fast heartbeat
+        case "Plateau": return 1.0   // Medium heartbeat
+        case "Come-down": return 1.5 // Slower heartbeat
+        case "After-effects": return 2.0 // Very slow heartbeat
+        case "Onset": return 1.2     // Slightly elevated heartbeat
+        default: return 2.0          // Normal heartbeat
         }
     }
     
@@ -162,7 +219,7 @@ struct DashboardView: View {
         
         VStack(spacing: 25) {
             ZStack {
-                // Pulse ring
+                // Pulse ring - now with bigger animation
                 Circle()
                     .fill(Color.clear)
                     .frame(width: 220, height: 220)
@@ -170,9 +227,9 @@ struct DashboardView: View {
                         Circle()
                             .stroke(circleColor.opacity(0.2), lineWidth: 40)
                     )
-                    .scaleEffect(pulseSize)
+                    .scaleEffect(pulseSize) // This now scales to 1.1 for a very visible effect
                 
-                // Main circle with heartbeat effect
+                // Main circle with heartbeat effect - now with bigger animation
                 Circle()
                     .fill(
                         RadialGradient(
@@ -183,7 +240,7 @@ struct DashboardView: View {
                         )
                     )
                     .frame(width: 200, height: 200)
-                    .scaleEffect(heartbeatPulse) // Apply heartbeat animation
+                    .scaleEffect(heartbeatSize) // This will pulse from 1.0 to 1.1 very visibly
                     .shadow(color: circleColor.opacity(0.5), radius: 15, x: 0, y: 0)
                 
                 // Inner content - UPDATED
@@ -308,19 +365,8 @@ struct DashboardView: View {
                         .fill(Color(UIColor.systemBackground))
                         .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
                     
-                    VStack(spacing: 10) {
-                        // Human figure visualization
-                        ZStack {
-                            Circle()
-                                .fill(getPhaseColors(minutesSince: minutesSince).main.opacity(0.2))
-                                .frame(width: 120, height: 120)
-                            
-                            Image(systemName: getPhaseSymbol(phase: phase?.name ?? "Recovery"))
-                                .font(.system(size: 60))
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(getPhaseColors(minutesSince: minutesSince).main)
-                        }
-                        
+                    VStack(spacing: 12) {
+                        // Only show the phase name and description, removed the icon as requested
                         Text(phase?.name ?? "Recovery")
                             .font(.headline)
                         
@@ -333,7 +379,7 @@ struct DashboardView: View {
                     }
                     .padding()
                 }
-                .frame(height: 240)
+                .frame(height: 100) // Reduced height since we removed the icon
                 .padding(.horizontal)
             }
         }
