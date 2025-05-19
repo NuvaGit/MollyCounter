@@ -9,6 +9,8 @@ struct DashboardView: View {
     @State private var timeNow = Date()
     @State private var pulseSize: CGFloat = 1.0
     @State private var heartbeatSize: CGFloat = 1.0
+    @AppStorage("emergencyContact") private var emergencyContact = ""
+    @AppStorage("emergencyContactName") private var emergencyContactName = ""
     
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
@@ -99,6 +101,12 @@ struct DashboardView: View {
                             .offset(y: animateCards ? 0 : 120)
                             .opacity(animateCards ? 1 : 0)
                         
+                        // NEW: Emergency Help Button
+                        emergencyHelpButton()
+                            .offset(y: animateCards ? 0 : 130)
+                            .opacity(animateCards ? 1 : 0)
+                            .padding(.top, 10)
+                        
                         Spacer(minLength: 30)
                     }
                 }
@@ -154,6 +162,78 @@ struct DashboardView: View {
         
         // Start the heartbeat loop
         animateHeartbeat()
+    }
+    
+    // MARK: - Emergency Help Button
+    
+    @ViewBuilder
+    func emergencyHelpButton() -> some View {
+        if !emergencyContact.isEmpty {
+            Button(action: {
+                // Call emergency contact
+                if let url = URL(string: "tel:\(emergencyContact.filter { $0.isNumber })") {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                HStack(spacing: 15) {
+                    Image(systemName: "exclamationmark.shield.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                    
+                    Text(emergencyContactName.isEmpty ? "Call Emergency Contact" : "Call \(emergencyContactName)")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white)
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "FF3B30"), Color(hex: "FF4F38")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+                .shadow(color: Color(hex: "FF3B30").opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+            .padding(.horizontal)
+        } else {
+            Button(action: {
+                showingEmergencySheet = true
+            }) {
+                HStack(spacing: 15) {
+                    Image(systemName: "exclamationmark.shield")
+                        .font(.system(size: 24))
+                        .foregroundColor(.red)
+                    
+                    Text("Set Up Emergency Contact")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .background(Color(UIColor.systemBackground))
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.red.opacity(0.5), lineWidth: 2)
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
+            .padding(.horizontal)
+        }
     }
     
     // Helper function to get current phase name
@@ -718,102 +798,6 @@ struct MDMATipsCard: View {
     }
 }
 
-// MARK: - Glass Card Component
-struct GlassCard<Content: View>: View {
-    @Environment(\.colorScheme) var colorScheme
-    var content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
-    var body: some View {
-        content
-            .padding()
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(colorScheme == .dark ? 
-                              Color.white.opacity(0.07) : 
-                              Color.white.opacity(0.9))
-                    
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(
-                            colorScheme == .dark ?
-                            Color.white.opacity(0.1) :
-                            Color.black.opacity(0.05),
-                            lineWidth: 1
-                        )
-                }
-                .shadow(color: colorScheme == .dark ? 
-                        Color.black.opacity(0.2) : 
-                        Color.black.opacity(0.1),
-                        radius: 10, x: 0, y: 5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-
-// MARK: - Flow Layout for tags
-struct FlowLayout<T: Hashable, Content: View>: View {
-    enum Mode {
-        case stack
-        case scrollable
-    }
-    
-    let mode: Mode
-    let items: [T]
-    let itemSpacing: CGFloat
-    let lineSpacing: CGFloat
-    @ViewBuilder let viewForItem: (T) -> Content
-    
-    var body: some View {
-        if mode == .stack {
-            VStack(alignment: .leading, spacing: lineSpacing) {
-                ForEach(getRows(), id: \.self) { row in
-                    HStack(spacing: itemSpacing) {
-                        ForEach(row, id: \.self) { item in
-                            viewForItem(item)
-                        }
-                    }
-                }
-            }
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: itemSpacing) {
-                    ForEach(items, id: \.self) { item in
-                        viewForItem(item)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func getRows() -> [[T]] {
-        var rows: [[T]] = [[]]
-        var currentRowWidth: CGFloat = 0
-        let screenWidth = UIScreen.main.bounds.width - 40 // Adjusting for container padding
-        
-        for item in items {
-            // This is a rough estimate of width, ideally we would measure the actual rendered width
-            let label = String(describing: item)
-            let estimatedWidth = CGFloat(label.count) * 10 + 40 // Rough estimate: 10pt per character + padding
-            
-            if currentRowWidth + estimatedWidth > screenWidth {
-                // Start a new row
-                rows.append([item])
-                currentRowWidth = estimatedWidth + itemSpacing
-            } else {
-                // Add to the current row
-                rows[rows.count - 1].append(item)
-                currentRowWidth += estimatedWidth + itemSpacing
-            }
-        }
-        
-        return rows
-    }
-}
-
 // MARK: - Quick Action Card
 struct QuickActionCard: View {
     let title: String
@@ -1059,6 +1043,84 @@ extension Color {
             green: Double(g) / 255,
             blue: Double(b) / 255,
             opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - Flow Layout Implementation
+struct FlowLayout<Data, Content>: View where Data: RandomAccessCollection, Data.Element: Hashable, Content: View {
+    enum Mode {
+        case stack
+        case scroll
+    }
+    
+    let mode: Mode
+    let items: Data
+    let itemSpacing: CGFloat
+    let lineSpacing: CGFloat
+    let content: (Data.Element) -> Content
+    
+    @State private var totalHeight = CGFloat.zero
+    
+    init(mode: Mode = .stack, items: Data, itemSpacing: CGFloat = 8, lineSpacing: CGFloat = 8, @ViewBuilder content: @escaping (Data.Element) -> Content) {
+        self.mode = mode
+        self.items = items
+        self.itemSpacing = itemSpacing
+        self.lineSpacing = lineSpacing
+        self.content = content
+    }
+    
+    var body: some View {
+        VStack {
+            GeometryReader { geometry in
+                self.generateContent(in: geometry)
+            }
+            .frame(height: totalHeight)
+        }
+    }
+    
+    private func generateContent(in geometry: GeometryProxy) -> some View {
+        var width = CGFloat.zero
+        var height = CGFloat.zero
+        
+        return ZStack(alignment: .topLeading) {
+            ForEach(items, id: \.self) { item in
+                content(item)
+                    .padding(.horizontal, itemSpacing)
+                    .padding(.vertical, lineSpacing)
+                    .alignmentGuide(.leading, computeValue: { dimension in
+                        if abs(width - dimension.width) > geometry.size.width {
+                            width = 0
+                            height -= dimension.height
+                        }
+                        
+                        let result = width
+                        
+                        if item == items.last {
+                            width = 0
+                        } else {
+                            width -= dimension.width
+                        }
+                        
+                        return result
+                    })
+                    .alignmentGuide(.top, computeValue: { _ in
+                        let result = height
+                        
+                        if item == items.last {
+                            height = 0
+                        }
+                        
+                        return result
+                    })
+            }
+        }
+        .background(
+            GeometryReader { geometry in
+                Color.clear.onAppear {
+                    totalHeight = geometry.size.height
+                }
+            }
         )
     }
 }

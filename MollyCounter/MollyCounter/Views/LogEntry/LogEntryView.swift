@@ -4,7 +4,6 @@ struct LogEntryView: View {
     @EnvironmentObject var dosageStore: DosageStore
     @State private var newDosage = Dosage.sampleDosage
     @State private var showingAlert = false
-    @State private var navigateToCalculator = false
     @State private var showEnvironment = false
     @State private var environment = "Home"
     @State private var selectedSymptoms: Set<String> = []
@@ -82,7 +81,7 @@ struct LogEntryView: View {
                     }
                 }
                 
-                Section(header: Text("Molly Effects")) {
+                Section(header: Text("MDMA Effects")) {
                     ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
                         Button(action: {
                             if selectedSymptoms.contains(symptom) {
@@ -143,11 +142,11 @@ struct LogEntryView: View {
                 .listRowInsets(EdgeInsets())
                 .padding()
             }
-            .navigationTitle("Log Molly Use")
+            .navigationTitle("Log MDMA Use")
             .alert("Saved!", isPresented: $showingAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Your Molly usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
+                Text("Your MDMA usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
             }
         }
     }
