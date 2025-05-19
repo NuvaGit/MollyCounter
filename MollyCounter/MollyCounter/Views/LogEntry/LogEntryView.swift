@@ -1,14 +1,23 @@
-//
-//  LogEntryView.swift
-//  MollyCounter
-//
-
 import SwiftUI
 
 struct LogEntryView: View {
     @EnvironmentObject var dosageStore: DosageStore
     @State private var newDosage = Dosage.sampleDosage
     @State private var showingAlert = false
+    @State private var navigateToCalculator = false
+    @State private var showEnvironment = false
+    @State private var environment = "Home"
+    @State private var selectedSymptoms: Set<String> = []
+    
+    // MDMA-specific symptoms to track
+    let possibleSymptoms = [
+        "Jaw clenching", "Eye wiggles", "Increased energy", 
+        "Euphoria", "Enhanced touch", "Sweating", 
+        "Thirst", "Increased heartrate", "Anxiety"
+    ]
+    
+    // MDMA-specific environments
+    let environments = ["Home", "Club", "Festival", "Party", "Concert", "Nature", "Other"]
     
     var body: some View {
         NavigationView {
@@ -25,6 +34,27 @@ struct LogEntryView: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
+                    
+                    // Modified to use navigation link directly to dosage calculator
+                    NavigationLink(destination: DosageCalculatorView()) {
+                        HStack {
+                            Image(systemName: "function")
+                            Text("Not sure? Calculate safe dosage")
+                        }
+                        .foregroundColor(.purple)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                Section(header: Text("Environment")) {
+                    Picker("Setting", selection: $environment) {
+                        ForEach(environments, id: \.self) { env in
+                            Text(env)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    
+                    Toggle("With trusted friends?", isOn: $showEnvironment)
                 }
                 
                 Section(header: Text("Health tracking")) {
@@ -52,32 +82,94 @@ struct LogEntryView: View {
                     }
                 }
                 
+                Section(header: Text("MDMA Effects")) {
+                    ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
+                        Button(action: {
+                            if selectedSymptoms.contains(symptom) {
+                                selectedSymptoms.remove(symptom)
+                            } else {
+                                selectedSymptoms.insert(symptom)
+                            }
+                        }) {
+                            HStack {
+                                Text(symptom)
+                                Spacer()
+                                if selectedSymptoms.contains(symptom) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+                        .foregroundColor(.primary)
+                    }
+                }
+                
+                Section(header: Text("Supplement Checklist")) {
+                    SupplementCheckView(name: "Magnesium (reduces jaw clenching)")
+                    SupplementCheckView(name: "Vitamin C (antioxidant)")
+                    SupplementCheckView(name: "ALA (Alpha Lipoic Acid)")
+                    SupplementCheckView(name: "CoQ10 (heart health)")
+                }
+                
                 Section(header: Text("Notes")) {
                     TextEditor(text: $newDosage.notes)
                         .frame(height: 100)
                 }
                 
                 Section {
-                    Button("Save Record") {
+                    Button(action: {
+                        // Store selected symptoms
+                        newDosage.symptoms = Array(selectedSymptoms)
+                        newDosage.location = environment
+                        
                         dosageStore.addDosage(newDosage)
                         showingAlert = true
+                        
+                        // Reset form
                         newDosage = Dosage.sampleDosage
+                        selectedSymptoms = []
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.pencil")
+                            Text("Save Record")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .foregroundColor(.white)
+                        .padding()
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .foregroundColor(.white)
-                    .padding()
                     .background(Color.purple)
                     .cornerRadius(8)
                 }
                 .listRowInsets(EdgeInsets())
                 .padding()
             }
-            .navigationTitle("Log Health Data")
+            .navigationTitle("Log MDMA Use")
             .alert("Saved!", isPresented: $showingAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Your health data has been recorded.")
+                Text("Your MDMA usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
             }
+        }
+    }
+}
+
+struct SupplementCheckView: View {
+    let name: String
+    @State private var isTaken = false
+    
+    var body: some View {
+        HStack {
+            Button(action: {
+                isTaken.toggle()
+            }) {
+                HStack {
+                    Text(name)
+                    Spacer()
+                    Image(systemName: isTaken ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(isTaken ? .green : .gray)
+                }
+            }
+            .foregroundColor(.primary)
         }
     }
 }

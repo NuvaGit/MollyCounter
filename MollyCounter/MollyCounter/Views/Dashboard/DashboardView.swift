@@ -35,6 +35,13 @@ struct DashboardView: View {
                                 .padding(.top, 30)
                         }
                         
+                        // NEW: MDMA State Human Figure Animation
+                        if let _ = dosageStore.dosages.last, isRecentDosage() {
+                            mdmaStateView()
+                                .offset(y: animateCards ? 0 : 60)
+                                .opacity(animateCards ? 1 : 0)
+                        }
+                        
                         // Future Apple Watch integration teaser
                         if let _ = dosageStore.dosages.last, isRecentDosage() {
                             healthMetricsTeaserView()
@@ -80,9 +87,9 @@ struct DashboardView: View {
                         .offset(y: animateCards ? 0 : 100)
                         .opacity(animateCards ? 1 : 0)
                         
-                        // Health tips
+                        // Health tips - Updated for MDMA
                         GlassCard {
-                            TipsCard()
+                            MDMATipsCard()
                         }
                         .padding(.horizontal)
                         .offset(y: animateCards ? 0 : 110)
@@ -179,8 +186,8 @@ struct DashboardView: View {
                     .scaleEffect(heartbeatPulse) // Apply heartbeat animation
                     .shadow(color: circleColor.opacity(0.5), radius: 15, x: 0, y: 0)
                 
-                // Inner content
-                VStack(spacing: 10) {
+                // Inner content - UPDATED
+                VStack(spacing: 8) {
                     if isRecentDosage() {
                         // Show phase information for recent dosage
                         Text(phase?.name ?? "Recovery")
@@ -191,7 +198,8 @@ struct DashboardView: View {
                             .font(.system(size: 18, weight: .medium, design: .monospaced))
                             .foregroundColor(.white.opacity(0.8))
                         
-                        HStack(spacing: 6) {
+                        // Put the active status and icon inside the circle
+                        VStack(spacing: 3) {
                             Circle()
                                 .fill(statusColor)
                                 .frame(width: 10, height: 10)
@@ -199,6 +207,12 @@ struct DashboardView: View {
                             Text("Active")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.9))
+                                
+                            // Add the icon based on the phase
+                            Image(systemName: getPhaseSymbol(phase: phase?.name ?? "Recovery"))
+                                .font(.system(size: 24))
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.top, 5)
                         }
                         .opacity(isRecentDosage() ? 1 : 0)
                     } else {
@@ -274,6 +288,57 @@ struct DashboardView: View {
         }
     }
     
+    // MARK: - MDMA State View - UPDATED
+    
+    @ViewBuilder
+    func mdmaStateView() -> some View {
+        if let lastDosage = dosageStore.dosages.last {
+            let minutesSince = Int(timeNow.timeIntervalSince(lastDosage.date) / 60)
+            let phase = getCurrentPhase(minutesSince: minutesSince)
+            
+            VStack(spacing: 15) {
+                Text("Current State")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                // Use rectangle shape instead of rounded rectangle
+                ZStack {
+                    // Background
+                    Rectangle()
+                        .fill(Color(UIColor.systemBackground))
+                        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+                    
+                    VStack(spacing: 10) {
+                        // Human figure visualization
+                        ZStack {
+                            Circle()
+                                .fill(getPhaseColors(minutesSince: minutesSince).main.opacity(0.2))
+                                .frame(width: 120, height: 120)
+                            
+                            Image(systemName: getPhaseSymbol(phase: phase?.name ?? "Recovery"))
+                                .font(.system(size: 60))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(getPhaseColors(minutesSince: minutesSince).main)
+                        }
+                        
+                        Text(phase?.name ?? "Recovery")
+                            .font(.headline)
+                        
+                        Text(getStateDescription(phase: phase?.name ?? "Recovery"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 10)
+                    }
+                    .padding()
+                }
+                .frame(height: 240)
+                .padding(.horizontal)
+            }
+        }
+    }
+    
     @ViewBuilder
     func emptyStateView() -> some View {
         VStack(spacing: 25) {
@@ -300,7 +365,7 @@ struct DashboardView: View {
                 }
             }
             
-            Text("Add your first record to track your health")
+            Text("Add your first record to track your MDMA use")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -368,7 +433,7 @@ struct DashboardView: View {
                 HStack(spacing: 15) {
                     QuickActionCard(
                         title: "Log",
-                        description: "Record health info",
+                        description: "Record MDMA use",
                         icon: "plus.circle.fill",
                         color: .blue,
                         action: {}
@@ -413,15 +478,15 @@ struct DashboardView: View {
     }
     
     func getPhaseColors(minutesSince: Int) -> (main: Color, status: Color) {
-        if minutesSince < 45 { // Onset
+        if minutesSince < 30 { // Onset - Updated time ranges for MDMA
             return (.blue, .blue)
-        } else if minutesSince < 90 { // Come-up
+        } else if minutesSince < 60 { // Come-up
             return (.purple, .purple)
-        } else if minutesSince < 210 { // Peak
+        } else if minutesSince < 150 { // Peak
             return (.pink, .pink)
-        } else if minutesSince < 300 { // Plateau
+        } else if minutesSince < 240 { // Plateau
             return (.orange, .orange)
-        } else if minutesSince < 420 { // Come-down
+        } else if minutesSince < 360 { // Come-down
             return (.yellow, .yellow)
         } else if minutesSince < 1440 { // After-effects
             return (.gray, .gray)
@@ -439,9 +504,49 @@ struct DashboardView: View {
         }
     }
     
+    // Helper function to get the SF Symbol based on the phase
+    func getPhaseSymbol(phase: String) -> String {
+        switch phase {
+        case "Onset":
+            return "figure.stand"
+        case "Come-up":
+            return "figure.walk"
+        case "Peak":
+            return "figure.dance"
+        case "Plateau":
+            return "figure.socialdance"
+        case "Come-down":
+            return "figure.walk.motion"
+        case "After-effects":
+            return "figure.rest"
+        default:
+            return "figure.stand"
+        }
+    }
+    
+    // Helper function to get the description based on phase
+    func getStateDescription(phase: String) -> String {
+        switch phase {
+        case "Onset":
+            return "Starting to feel initial effects"
+        case "Come-up":
+            return "Energy increasing, euphoria beginning"
+        case "Peak":
+            return "Maximum euphoria and energy"
+        case "Plateau":
+            return "Sustained effects with stable energy"
+        case "Come-down":
+            return "Effects gradually reducing"
+        case "After-effects":
+            return "Tired, recovery beginning"
+        default:
+            return "No active effects"
+        }
+    }
+    
     func getRecoveryTips(daysSince: Int) -> [String] {
         if daysSince < 7 {
-            return ["Rest", "Hydrate", "Healthy food", "Avoid alcohol", "5-HTP supplements"]
+            return ["Rest", "Hydrate", "5-HTP supplements", "Nutritious food", "Avoid alcohol"]
         } else if daysSince < 30 {
             return ["Exercise", "Meditation", "Sleep hygiene", "Balanced diet"]
         } else if daysSince < 90 {
@@ -455,7 +560,7 @@ struct DashboardView: View {
         let effectPhases = [
             EffectPhase(
                 name: "Onset",
-                timeRange: 0...45,
+                timeRange: 0...30,
                 description: "Initial absorption",
                 feelings: ["Anticipation", "Subtle changes", "Alertness"],
                 color: .blue,
@@ -463,7 +568,7 @@ struct DashboardView: View {
             ),
             EffectPhase(
                 name: "Come-up",
-                timeRange: 45...90,
+                timeRange: 30...60,
                 description: "Effects begin",
                 feelings: ["Energy", "Enhanced mood", "Excitement", "Possible anxiety"],
                 color: .purple,
@@ -471,7 +576,7 @@ struct DashboardView: View {
             ),
             EffectPhase(
                 name: "Peak",
-                timeRange: 90...210,
+                timeRange: 60...150,
                 description: "Maximum effects",
                 feelings: ["Euphoria", "Empathy", "Enhanced senses", "Sociability"],
                 color: .pink,
@@ -479,7 +584,7 @@ struct DashboardView: View {
             ),
             EffectPhase(
                 name: "Plateau",
-                timeRange: 210...300,
+                timeRange: 150...240,
                 description: "Sustained effects",
                 feelings: ["Continued euphoria", "Reduced intensity", "Energy"],
                 color: .orange,
@@ -487,7 +592,7 @@ struct DashboardView: View {
             ),
             EffectPhase(
                 name: "Come-down",
-                timeRange: 300...420,
+                timeRange: 240...360,
                 description: "Reducing effects",
                 feelings: ["Gentle decline", "Less energy", "Relaxation"],
                 color: .yellow,
@@ -495,7 +600,7 @@ struct DashboardView: View {
             ),
             EffectPhase(
                 name: "After-effects",
-                timeRange: 420...1440,
+                timeRange: 360...1440,
                 description: "Recovery beginning",
                 feelings: ["Fatigue", "Reflective", "Rest needed"],
                 color: .gray,
@@ -546,6 +651,24 @@ struct MetricTeaserCard: View {
         .background(Color(UIColor.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - MDMA-specific tips card
+struct MDMATipsCard: View {
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("MDMA Safety Tips")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                TipRow(icon: "drop.fill", text: "Drink ~500ml water per hour, not more")
+                TipRow(icon: "thermometer", text: "Take breaks from dancing to cool down")
+                TipRow(icon: "clock.arrow.2.circlepath", text: "Wait 3+ months between uses")
+                TipRow(icon: "pills.fill", text: "Consider pre/post-loading supplements")
+                TipRow(icon: "brain.head.profile", text: "Lower doses reduce neurotoxicity risk")
+            }
+        }
     }
 }
 
@@ -645,16 +768,6 @@ struct FlowLayout<T: Hashable, Content: View>: View {
     }
 }
 
-// MARK: - Effect Phase model
-struct EffectPhase {
-    let name: String
-    let timeRange: ClosedRange<Int> // in minutes from dosage
-    let description: String
-    let feelings: [String]
-    let color: Color
-    let icon: String
-}
-
 // MARK: - Quick Action Card
 struct QuickActionCard: View {
     let title: String
@@ -704,7 +817,7 @@ struct RecoveryTimelineCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Recovery Timeline")
+            Text("MDMA Recovery Timeline")
                 .font(.headline)
             
             let daysSinceLastUse = dosages.isEmpty ? 999 : Int(Date().timeIntervalSince(dosages.last!.date) / 86400)
@@ -712,21 +825,21 @@ struct RecoveryTimelineCard: View {
             VStack(spacing: 15) {
                 RecoveryMilestone(
                     name: "7 Days",
-                    description: "Sleep patterns begin to normalize",
+                    description: "Serotonin begins to replenish",
                     achieved: daysSinceLastUse >= 7,
                     daysLeft: max(0, 7 - daysSinceLastUse)
                 )
                 
                 RecoveryMilestone(
                     name: "30 Days", 
-                    description: "Mood stabilizes and energy improves",
+                    description: "Mood and energy significantly improve",
                     achieved: daysSinceLastUse >= 30,
                     daysLeft: max(0, 30 - daysSinceLastUse)
                 )
                 
                 RecoveryMilestone(
                     name: "90 Days",
-                    description: "Neurotransmitter systems healing well",
+                    description: "Recommended time between MDMA uses",
                     achieved: daysSinceLastUse >= 90,
                     daysLeft: max(0, 90 - daysSinceLastUse)
                 )
@@ -774,7 +887,7 @@ struct UsageGraphCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Usage Patterns")
+            Text("MDMA Usage Patterns")
                 .font(.headline)
             
             if dosages.count < 2 {
@@ -848,21 +961,6 @@ struct UsageGraphCard: View {
 }
 
 // MARK: - Tips Component
-struct TipsCard: View {
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Health Tips")
-                .font(.headline)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                TipRow(icon: "drop.fill", text: "Stay hydrated but don't overhydrate")
-                TipRow(icon: "thermometer", text: "Monitor your body temperature")
-                TipRow(icon: "bed.double.fill", text: "Ensure you get enough rest")
-            }
-        }
-    }
-}
-
 struct TipRow: View {
     let icon: String
     let text: String
