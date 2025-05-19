@@ -1,138 +1,295 @@
-//
-//  DashboardView.swift
-//  MollyCounter
-//
-
 import SwiftUI
 import Charts
 
 struct DashboardView: View {
+    @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var dosageStore: DosageStore
     @State private var showingEmergencySheet = false
+    @State private var animateCards = false
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Emergency access
-                    EmergencyCard(showingSheet: $showingEmergencySheet)
-                    
-                    // Current status
-                    if let lastDosage = dosageStore.dosages.last {
-                        CurrentStatusCard(dosage: lastDosage)
-                    } else {
-                        NoUsageCard()
+            ZStack {
+                // Dynamic background
+                backgroundGradient
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 25) {
+                        // Current status hero section
+                        if let lastDosage = dosageStore.dosages.last {
+                            heroSection(dosage: lastDosage)
+                                .offset(y: animateCards ? 0 : 50)
+                                .opacity(animateCards ? 1 : 0)
+                        } else {
+                            noRecordsView()
+                                .offset(y: animateCards ? 0 : 50)
+                                .opacity(animateCards ? 1 : 0)
+                        }
+                        
+                        // Recovery timeline
+                        GlassCard {
+                            RecoveryTimelineCard(dosages: dosageStore.dosages)
+                        }
+                        .padding(.horizontal)
+                        .offset(y: animateCards ? 0 : 70)
+                        .opacity(animateCards ? 1 : 0)
+                        
+                        // Usage patterns
+                        GlassCard {
+                            UsageGraphCard(dosages: dosageStore.dosages)
+                        }
+                        .padding(.horizontal)
+                        .offset(y: animateCards ? 0 : 90)
+                        .opacity(animateCards ? 1 : 0)
+                        
+                        // Health tips
+                        GlassCard {
+                            TipsCard()
+                        }
+                        .padding(.horizontal)
+                        .offset(y: animateCards ? 0 : 110)
+                        .opacity(animateCards ? 1 : 0)
+                        
+                        // Quick actions
+                        quickActionsSection()
+                            .offset(y: animateCards ? 0 : 130)
+                            .opacity(animateCards ? 1 : 0)
+                        
+                        Spacer(minLength: 20)
+                    }
+                    .padding(.top, 20)
+                }
+                .navigationTitle("Dashboard")
+                .sheet(isPresented: $showingEmergencySheet) {
+                    EmergencyContactView()
+                }
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                animateCards = true
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var backgroundGradient: some View {
+        let colors: [Color] = colorScheme == .dark ? 
+            [Color(hex: "121212"), Color(hex: "1E1E1E")] : 
+            [Color(hex: "F8F9FA"), Color(hex: "E9ECEF")]
+        
+        LinearGradient(
+            colors: colors,
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    @ViewBuilder
+    func heroSection(dosage: Dosage) -> some View {
+        let daysSince = Int(Date().timeIntervalSince(dosage.date) / 86400)
+        let hoursSince = Int(Date().timeIntervalSince(dosage.date) / 3600) % 24
+        
+        VStack(spacing: 0) {
+            // Recovery progress
+            GlassCard {
+                VStack(spacing: 20) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Recovery Progress")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                            
+                            Text(getPhaseName(daysSince: daysSince))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Dynamic color based on progress
+                        let progressColors: [Color] = {
+                            if daysSince < 7 {
+                                return [.orange, .red]
+                            } else if daysSince < 30 {
+                                return [.yellow, .orange]
+                            } else if daysSince < 90 {
+                                return [.blue, .purple]
+                            } else {
+                                return [.green, .blue]
+                            }
+                        }()
+                        
+                        AnimatedProgressRing(
+                            progress: min(Double(daysSince) / 90.0, 1.0),
+                            size: 80,
+                            colors: progressColors
+                        )
                     }
                     
-                    // Recovery timeline
-                    RecoveryTimelineCard(dosages: dosageStore.dosages)
+                    Divider()
+                        .padding(.vertical, 5)
                     
-                    // Usage graph
-                    UsageGraphCard(dosages: dosageStore.dosages)
+                    HStack(spacing: 25) {
+                        VStack(spacing: 8) {
+                            Text("\(daysSince)")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                            Text("Days")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("\(hoursSince)")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                            Text("Hours")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("\(dosage.amount, specifier: "%.0f")")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                            Text("mg")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                     
-                    // Health tips
-                    TipsCard()
+                    // Phase info
+                    phaseInfoView(daysSince: daysSince)
                 }
-                .padding()
             }
-            .navigationTitle("Health Dashboard")
-            .sheet(isPresented: $showingEmergencySheet) {
-                EmergencyContactView()
-            }
+            .padding(.horizontal)
         }
     }
-}
-
-struct EmergencyCard: View {
-    @Binding var showingSheet: Bool
     
-    var body: some View {
-        Button(action: {
-            showingSheet = true
-        }) {
-            HStack {
-                Image(systemName: "phone.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                
-                Text("Emergency Contact")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.red)
-            .cornerRadius(12)
-        }
-    }
-}
-
-struct CurrentStatusCard: View {
-    let dosage: Dosage
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Current Status")
-                .font(.headline)
+    @ViewBuilder
+    func phaseInfoView(daysSince: Int) -> some View {
+        HStack(spacing: 15) {
+            Image(systemName: getPhaseIcon(daysSince: daysSince))
+                .font(.system(size: 30))
+                .foregroundColor(getPhaseColor(daysSince: daysSince))
+                .frame(width: 40)
             
-            let daysSince = Int(Date().timeIntervalSince(dosage.date) / 86400)
-            let hoursSince = Int(Date().timeIntervalSince(dosage.date) / 3600) % 24
-            
-            // Current recovery phase
-            HStack {
-                Image(systemName: getPhaseIcon(daysSince: daysSince))
-                    .foregroundColor(getPhaseColor(daysSince: daysSince))
-                    .font(.title)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(getPhaseDescription(daysSince: daysSince))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                 
-                VStack(alignment: .leading) {
-                    Text(getPhaseName(daysSince: daysSince))
-                        .font(.title3)
-                        .bold()
-                    Text(getPhaseDescription(daysSince: daysSince))
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Divider()
-            
-            // Time since last use
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Last recorded use:")
-                        .font(.subheadline)
-                    Text("\(daysSince) days, \(hoursSince) hours ago")
-                        .font(.title3)
-                        .bold()
-                    Text("Amount: \(dosage.amount, specifier: "%.1f") mg")
-                        .font(.subheadline)
-                }
-                
-                Spacer()
-                
-                // Circular progress toward 90-day recovery
-                ZStack {
-                    Circle()
-                        .stroke(lineWidth: 10)
-                        .opacity(0.3)
-                        .foregroundColor(Color.blue)
-                    
-                    Circle()
-                        .trim(from: 0.0, to: min(CGFloat(daysSince) / 90.0, 1.0))
-                        .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round))
-                        .foregroundColor(Color.blue)
-                        .rotationEffect(Angle(degrees: 270.0))
-                    
-                    Text("\(min(daysSince * 100 / 90, 100))%")
+                if daysSince < 90 {
+                    Text("\(90 - daysSince) days until full recovery")
                         .font(.caption)
-                        .bold()
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Recommended recovery period complete")
+                        .font(.caption)
+                        .foregroundColor(.green)
                 }
-                .frame(width: 60, height: 60)
             }
+            
+            Spacer()
         }
         .padding()
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(colorScheme == .dark ? 
+                      Color.white.opacity(0.05) : 
+                      Color.black.opacity(0.03))
+        )
+    }
+    
+    @ViewBuilder
+    func noRecordsView() -> some View {
+        GlassCard {
+            VStack(spacing: 20) {
+                Image(systemName: "clipboard")
+                    .font(.system(size: 60))
+                    .foregroundColor(.blue)
+                    .padding()
+                    .background(Circle().fill(Color.blue.opacity(0.1)))
+                
+                Text("No Records Yet")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                
+                Text("Use the Log tab to record health information and track your recovery journey.")
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                
+                Button(action: {
+                    // Tab to log entry
+                }) {
+                    Text("Add First Record")
+                        .fontWeight(.semibold)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .padding(.top, 10)
+            }
+            .padding()
+        }
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    func quickActionsSection() -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Quick Actions")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 15) {
+                    QuickActionCard(
+                        title: "Log",
+                        description: "Record health info",
+                        icon: "plus.circle.fill",
+                        color: .blue,
+                        action: {}
+                    )
+                    
+                    QuickActionCard(
+                        title: "Calculator",
+                        description: "Safe dosage info",
+                        icon: "function",
+                        color: .purple,
+                        action: {}
+                    )
+                    
+                    QuickActionCard(
+                        title: "History",
+                        description: "View past records",
+                        icon: "clock.fill",
+                        color: .orange,
+                        action: {}
+                    )
+                    
+                    QuickActionCard(
+                        title: "Resources",
+                        description: "Safety information",
+                        icon: "heart.text.square.fill",
+                        color: .green,
+                        action: {}
+                    )
+                }
+                .padding(.horizontal)
+            }
+        }
     }
     
     // Helper functions for status display
@@ -185,20 +342,7 @@ struct CurrentStatusCard: View {
     }
 }
 
-struct NoUsageCard: View {
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("No Records")
-                .font(.headline)
-            Text("Use the Log tab to record health information")
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
+// MARK: - Missing Components Added Here
 
 struct RecoveryTimelineCard: View {
     let dosages: [Dosage]
@@ -210,34 +354,29 @@ struct RecoveryTimelineCard: View {
             
             let daysSinceLastUse = dosages.isEmpty ? 999 : Int(Date().timeIntervalSince(dosages.last!.date) / 86400)
             
-            TimelineView(.everyMinute) { timeline in
-                VStack(spacing: 15) {
-                    RecoveryMilestone(
-                        name: "7 Days",
-                        description: "Sleep patterns begin to normalize",
-                        achieved: daysSinceLastUse >= 7,
-                        daysLeft: max(0, 7 - daysSinceLastUse)
-                    )
-                    
-                    RecoveryMilestone(
-                        name: "30 Days", 
-                        description: "Mood stabilizes and energy improves",
-                        achieved: daysSinceLastUse >= 30,
-                        daysLeft: max(0, 30 - daysSinceLastUse)
-                    )
-                    
-                    RecoveryMilestone(
-                        name: "90 Days",
-                        description: "Neurotransmitter systems healing well",
-                        achieved: daysSinceLastUse >= 90,
-                        daysLeft: max(0, 90 - daysSinceLastUse)
-                    )
-                }
+            VStack(spacing: 15) {
+                RecoveryMilestone(
+                    name: "7 Days",
+                    description: "Sleep patterns begin to normalize",
+                    achieved: daysSinceLastUse >= 7,
+                    daysLeft: max(0, 7 - daysSinceLastUse)
+                )
+                
+                RecoveryMilestone(
+                    name: "30 Days", 
+                    description: "Mood stabilizes and energy improves",
+                    achieved: daysSinceLastUse >= 30,
+                    daysLeft: max(0, 30 - daysSinceLastUse)
+                )
+                
+                RecoveryMilestone(
+                    name: "90 Days",
+                    description: "Neurotransmitter systems healing well",
+                    achieved: daysSinceLastUse >= 90,
+                    daysLeft: max(0, 90 - daysSinceLastUse)
+                )
             }
         }
-        .padding()
-        .background(Color.purple.opacity(0.1))
-        .cornerRadius(12)
     }
 }
 
@@ -309,9 +448,6 @@ struct UsageGraphCard: View {
                 }
             }
         }
-        .padding()
-        .background(Color.purple.opacity(0.1))
-        .cornerRadius(12)
     }
     
     // Helpers for chart data
@@ -367,9 +503,6 @@ struct TipsCard: View {
                 TipRow(icon: "bed.double.fill", text: "Ensure you get enough rest")
             }
         }
-        .padding()
-        .background(Color.green.opacity(0.1))
-        .cornerRadius(12)
     }
 }
 
@@ -387,7 +520,40 @@ struct TipRow: View {
     }
 }
 
-// Additional extension for calendar calculations
+struct QuickActionCard: View {
+    let title: String
+    let description: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 140, height: 120)
+            .padding()
+            .background(Color(UIColor.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// Calendar extension for date calculations
 extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         let components = dateComponents([.year, .month], from: date)
@@ -402,100 +568,34 @@ extension Calendar {
     }
 }
 
-struct EmergencyContactView: View {
-    var body: some View {
-        NavigationView {
-            List {
-                Section(header: Text("Emergency Numbers")) {
-                    EmergencyContactRow(
-                        name: "Emergency Services",
-                        number: "911",
-                        icon: "phone.fill",
-                        color: .red
-                    )
-                    
-                    EmergencyContactRow(
-                        name: "Poison Control",
-                        number: "1-800-222-1222",
-                        icon: "cross.case.fill",
-                        color: .blue
-                    )
-                    
-                    EmergencyContactRow(
-                        name: "Crisis Text Line",
-                        number: "Text HOME to 741741",
-                        icon: "message.fill",
-                        color: .green
-                    )
-                }
-                
-                Section(header: Text("Warning Signs")) {
-                    WarningRow(sign: "High fever or overheating")
-                    WarningRow(sign: "Severe headache or dizziness")
-                    WarningRow(sign: "Irregular heartbeat")
-                    WarningRow(sign: "Excessive sweating/chills")
-                    WarningRow(sign: "Confusion or disorientation")
-                    WarningRow(sign: "Severe anxiety or panic")
-                }
-            }
-            .navigationTitle("Emergency Resources")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
-                        // Sheet will dismiss
-                    }
-                }
-            }
+// Color extension helper
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
         }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
-struct EmergencyContactRow: View {
-    let name: String
-    let number: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .font(.title3)
-                .frame(width: 30)
-            
-            VStack(alignment: .leading) {
-                Text(name)
-                    .font(.headline)
-                Text(number)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let url = URL(string: "tel:\(number.filter { $0.isNumber })"), number != "Text HOME to 741741" {
-                Link(destination: url) {
-                    Image(systemName: "phone.arrow.up.right.fill")
-                        .foregroundColor(.blue)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct WarningRow: View {
-    let sign: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
-            Text(sign)
-        }
-    }
-}
-
+// Preview provider
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         DashboardView()
