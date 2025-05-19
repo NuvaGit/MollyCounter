@@ -6,6 +6,12 @@ struct DashboardView: View {
     @EnvironmentObject var dosageStore: DosageStore
     @State private var showingEmergencySheet = false
     @State private var animateCards = false
+    @State private var timeNow = Date()
+    @State private var pulseSize: CGFloat = 1.0
+    @State private var heartbeatPulse: CGFloat = 1.0
+    
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    let heartbeatTimer = Timer.publish(every: 0.85, on: .main, in: .common).autoconnect() // Simulated heartbeat
     
     var body: some View {
         NavigationView {
@@ -15,32 +21,63 @@ struct DashboardView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 25) {
-                        // Current status hero section
+                    VStack(spacing: 20) {
+                        // Pulsing circle with effects
                         if let lastDosage = dosageStore.dosages.last {
-                            heroSection(dosage: lastDosage)
+                            pulseCircleView(dosage: lastDosage)
                                 .offset(y: animateCards ? 0 : 50)
                                 .opacity(animateCards ? 1 : 0)
+                                .padding(.top, 20)
                         } else {
-                            noRecordsView()
+                            emptyStateView()
                                 .offset(y: animateCards ? 0 : 50)
+                                .opacity(animateCards ? 1 : 0)
+                                .padding(.top, 30)
+                        }
+                        
+                        // Future Apple Watch integration teaser
+                        if let _ = dosageStore.dosages.last, isRecentDosage() {
+                            healthMetricsTeaserView()
+                                .offset(y: animateCards ? 0 : 70)
                                 .opacity(animateCards ? 1 : 0)
                         }
                         
-                        // Recovery timeline
-                        GlassCard {
-                            RecoveryTimelineCard(dosages: dosageStore.dosages)
+                        // Divider with "More info" text
+                        HStack {
+                            VStack {
+                                Divider()
+                            }
+                            
+                            Text("More Info")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 10)
+                            
+                            VStack {
+                                Divider()
+                            }
                         }
                         .padding(.horizontal)
-                        .offset(y: animateCards ? 0 : 70)
+                        .padding(.top, 20)
+                        .offset(y: animateCards ? 0 : 80)
                         .opacity(animateCards ? 1 : 0)
                         
-                        // Usage patterns
+                        // Recovery timeline card
+                        if let lastDosage = dosageStore.dosages.last {
+                            GlassCard {
+                                RecoveryTimelineCard(dosages: dosageStore.dosages)
+                            }
+                            .padding(.horizontal)
+                            .offset(y: animateCards ? 0 : 90)
+                            .opacity(animateCards ? 1 : 0)
+                        }
+                        
+                        // Usage graph card
                         GlassCard {
                             UsageGraphCard(dosages: dosageStore.dosages)
                         }
                         .padding(.horizontal)
-                        .offset(y: animateCards ? 0 : 90)
+                        .offset(y: animateCards ? 0 : 100)
                         .opacity(animateCards ? 1 : 0)
                         
                         // Health tips
@@ -53,14 +90,13 @@ struct DashboardView: View {
                         
                         // Quick actions
                         quickActionsSection()
-                            .offset(y: animateCards ? 0 : 130)
+                            .offset(y: animateCards ? 0 : 120)
                             .opacity(animateCards ? 1 : 0)
                         
-                        Spacer(minLength: 20)
+                        Spacer(minLength: 30)
                     }
-                    .padding(.top, 20)
                 }
-                .navigationTitle("Dashboard")
+                .navigationTitle("Molly Counter")
                 .sheet(isPresented: $showingEmergencySheet) {
                     EmergencyContactView()
                 }
@@ -70,8 +106,31 @@ struct DashboardView: View {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
                 animateCards = true
             }
+            
+            // Start breathing animation
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                pulseSize = 1.05
+            }
+        }
+        .onReceive(timer) { _ in
+            timeNow = Date()
+        }
+        .onReceive(heartbeatTimer) { _ in
+            // Simulate heartbeat animation
+            withAnimation(.easeOut(duration: 0.2)) {
+                heartbeatPulse = 1.06
+            }
+            
+            // Return to normal size with subtle delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.easeIn(duration: 0.4)) {
+                    heartbeatPulse = 1.0
+                }
+            }
         }
     }
+    
+    // MARK: - Background Gradient
     
     @ViewBuilder
     var backgroundGradient: some View {
@@ -86,164 +145,216 @@ struct DashboardView: View {
         )
     }
     
+    // MARK: - Pulse Circle View
+    
     @ViewBuilder
-    func heroSection(dosage: Dosage) -> some View {
-        let daysSince = Int(Date().timeIntervalSince(dosage.date) / 86400)
-        let hoursSince = Int(Date().timeIntervalSince(dosage.date) / 3600) % 24
+    func pulseCircleView(dosage: Dosage) -> some View {
+        let minutesSince = Int(timeNow.timeIntervalSince(dosage.date) / 60)
+        let phase = getCurrentPhase(minutesSince: minutesSince)
+        let (circleColor, statusColor) = getPhaseColors(minutesSince: minutesSince)
         
-        VStack(spacing: 0) {
-            // Recovery progress
-            GlassCard {
-                VStack(spacing: 20) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Recovery Progress")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(colorScheme == .dark ? .white : .black)
+        VStack(spacing: 25) {
+            ZStack {
+                // Pulse ring
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: 220, height: 220)
+                    .overlay(
+                        Circle()
+                            .stroke(circleColor.opacity(0.2), lineWidth: 40)
+                    )
+                    .scaleEffect(pulseSize)
+                
+                // Main circle with heartbeat effect
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [circleColor.opacity(0.7), circleColor]),
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 120
+                        )
+                    )
+                    .frame(width: 200, height: 200)
+                    .scaleEffect(heartbeatPulse) // Apply heartbeat animation
+                    .shadow(color: circleColor.opacity(0.5), radius: 15, x: 0, y: 0)
+                
+                // Inner content
+                VStack(spacing: 10) {
+                    if isRecentDosage() {
+                        // Show phase information for recent dosage
+                        Text(phase?.name ?? "Recovery")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text(formatTimeInterval(minutes: minutesSince))
+                            .font(.system(size: 18, weight: .medium, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 10, height: 10)
                             
-                            Text(getPhaseName(daysSince: daysSince))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            Text("Active")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.9))
                         }
+                        .opacity(isRecentDosage() ? 1 : 0)
+                    } else {
+                        // Show recovery information for older dosage
+                        let daysSince = Int(timeNow.timeIntervalSince(dosage.date) / 86400)
                         
-                        Spacer()
+                        Text("Day \(daysSince)")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
                         
-                        // Dynamic color based on progress
-                        let progressColors: [Color] = {
-                            if daysSince < 7 {
-                                return [.orange, .red]
-                            } else if daysSince < 30 {
-                                return [.yellow, .orange]
-                            } else if daysSince < 90 {
-                                return [.blue, .purple]
-                            } else {
-                                return [.green, .blue]
-                            }
-                        }()
+                        Text("Recovery")
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.8))
                         
-                        AnimatedProgressRing(
-                            progress: min(Double(daysSince) / 90.0, 1.0),
-                            size: 80,
-                            colors: progressColors
-                        )
+                        Text("\(max(0, 90 - daysSince)) days left")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.9))
                     }
-                    
-                    Divider()
-                        .padding(.vertical, 5)
-                    
-                    HStack(spacing: 25) {
-                        VStack(spacing: 8) {
-                            Text("\(daysSince)")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(colorScheme == .dark ? .white : .black)
-                            Text("Days")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        VStack(spacing: 8) {
-                            Text("\(hoursSince)")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(colorScheme == .dark ? .white : .black)
-                            Text("Hours")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        VStack(spacing: 8) {
-                            Text("\(dosage.amount, specifier: "%.0f")")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(colorScheme == .dark ? .white : .black)
-                            Text("mg")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // Phase info
-                    phaseInfoView(daysSince: daysSince)
                 }
             }
-            .padding(.horizontal)
+            
+            // Current feelings
+            if isRecentDosage(), let phase = phase {
+                VStack(spacing: 8) {
+                    Text("Current Effects")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    FlowLayout(
+                        mode: .stack,
+                        items: phase.feelings,
+                        itemSpacing: 8,
+                        lineSpacing: 8
+                    ) { feeling in
+                        Text(feeling)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(circleColor.opacity(0.15))
+                            .foregroundColor(circleColor)
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+            } else if !isRecentDosage() {
+                VStack(spacing: 8) {
+                    Text("Recovery Focus")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    let daysSince = Int(timeNow.timeIntervalSince(dosage.date) / 86400)
+                    let recoveryTips = getRecoveryTips(daysSince: daysSince)
+                    
+                    FlowLayout(
+                        mode: .stack,
+                        items: recoveryTips,
+                        itemSpacing: 8,
+                        lineSpacing: 8
+                    ) { tip in
+                        Text(tip)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(circleColor.opacity(0.15))
+                            .foregroundColor(circleColor)
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
         }
     }
     
     @ViewBuilder
-    func phaseInfoView(daysSince: Int) -> some View {
-        HStack(spacing: 15) {
-            Image(systemName: getPhaseIcon(daysSince: daysSince))
-                .font(.system(size: 30))
-                .foregroundColor(getPhaseColor(daysSince: daysSince))
-                .frame(width: 40)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(getPhaseDescription(daysSince: daysSince))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                if daysSince < 90 {
-                    Text("\(90 - daysSince) days until full recovery")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Recommended recovery period complete")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-            }
-            
-            Spacer()
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? 
-                      Color.white.opacity(0.05) : 
-                      Color.black.opacity(0.03))
-        )
-    }
-    
-    @ViewBuilder
-    func noRecordsView() -> some View {
-        GlassCard {
-            VStack(spacing: 20) {
-                Image(systemName: "clipboard")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                    .padding()
-                    .background(Circle().fill(Color.blue.opacity(0.1)))
-                
-                Text("No Records Yet")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                
-                Text("Use the Log tab to record health information and track your recovery journey.")
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                
-                Button(action: {
-                    // Tab to log entry
-                }) {
-                    Text("Add First Record")
-                        .fontWeight(.semibold)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+    func emptyStateView() -> some View {
+        VStack(spacing: 25) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.7)]),
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 120
                         )
+                    )
+                    .frame(width: 200, height: 200)
+                
+                VStack(spacing: 10) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 40))
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    
+                    Text("No Records")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                 }
-                .padding(.top, 10)
             }
-            .padding()
+            
+            Text("Add your first record to track your health")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            Button(action: {
+                // Navigate to log tab
+            }) {
+                Text("Add Record")
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
+                    .foregroundColor(.white)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func healthMetricsTeaserView() -> some View {
+        HStack(spacing: 15) {
+            MetricTeaserCard(
+                title: "Heart Rate",
+                value: "-- BPM",
+                icon: "heart.fill",
+                color: .red
+            )
+            
+            MetricTeaserCard(
+                title: "Body Temp",
+                value: "-- °C",
+                icon: "thermometer",
+                color: .orange
+            )
+            
+            MetricTeaserCard(
+                title: "Hydration",
+                value: "-- %",
+                icon: "drop.fill",
+                color: .blue
+            )
         }
         .padding(.horizontal)
+        .padding(.top, 10)
     }
     
     @ViewBuilder
@@ -264,6 +375,16 @@ struct DashboardView: View {
                     )
                     
                     QuickActionCard(
+                        title: "Emergency",
+                        description: "Contact resources",
+                        icon: "phone.fill",
+                        color: .red,
+                        action: {
+                            showingEmergencySheet = true
+                        }
+                    )
+                    
+                    QuickActionCard(
                         title: "Calculator",
                         description: "Safe dosage info",
                         icon: "function",
@@ -278,72 +399,306 @@ struct DashboardView: View {
                         color: .orange,
                         action: {}
                     )
-                    
-                    QuickActionCard(
-                        title: "Resources",
-                        description: "Safety information",
-                        icon: "heart.text.square.fill",
-                        color: .green,
-                        action: {}
-                    )
                 }
                 .padding(.horizontal)
             }
         }
     }
     
-    // Helper functions for status display
-    func getPhaseName(daysSince: Int) -> String {
-        if daysSince < 7 {
-            return "Acute Recovery"
-        } else if daysSince < 30 {
-            return "Mid Recovery"
-        } else if daysSince < 90 {
-            return "Late Recovery"
-        } else {
-            return "Full Recovery"
+    // MARK: - Helper Methods
+    
+    func isRecentDosage() -> Bool {
+        guard let lastDosage = dosageStore.dosages.last else { return false }
+        return timeNow.timeIntervalSince(lastDosage.date) < 24 * 3600 // 24 hours
+    }
+    
+    func getPhaseColors(minutesSince: Int) -> (main: Color, status: Color) {
+        if minutesSince < 45 { // Onset
+            return (.blue, .blue)
+        } else if minutesSince < 90 { // Come-up
+            return (.purple, .purple)
+        } else if minutesSince < 210 { // Peak
+            return (.pink, .pink)
+        } else if minutesSince < 300 { // Plateau
+            return (.orange, .orange)
+        } else if minutesSince < 420 { // Come-down
+            return (.yellow, .yellow)
+        } else if minutesSince < 1440 { // After-effects
+            return (.gray, .gray)
+        } else { // Recovery
+            let daysSince = minutesSince / 1440
+            if daysSince < 7 {
+                return (.orange, .orange)
+            } else if daysSince < 30 {
+                return (.yellow, .yellow)
+            } else if daysSince < 90 {
+                return (.blue, .blue)
+            } else {
+                return (.green, .green)
+            }
         }
     }
     
-    func getPhaseDescription(daysSince: Int) -> String {
+    func getRecoveryTips(daysSince: Int) -> [String] {
         if daysSince < 7 {
-            return "Body is clearing substances"
+            return ["Rest", "Hydrate", "Healthy food", "Avoid alcohol", "5-HTP supplements"]
         } else if daysSince < 30 {
-            return "Neurotransmitters rebalancing"
+            return ["Exercise", "Meditation", "Sleep hygiene", "Balanced diet"]
         } else if daysSince < 90 {
-            return "Final healing stages"
+            return ["Regular exercise", "Social support", "Healthy habits"]
         } else {
-            return "3+ months since last use"
+            return ["Maintain health", "Long-term wellness", "Balanced lifestyle"]
         }
     }
     
-    func getPhaseIcon(daysSince: Int) -> String {
-        if daysSince < 7 {
-            return "arrow.counterclockwise.circle.fill"
-        } else if daysSince < 30 {
-            return "chart.line.uptrend.xyaxis.circle.fill"
-        } else if daysSince < 90 {
-            return "leaf.circle.fill"
-        } else {
-            return "checkmark.seal.fill"
-        }
+    func getCurrentPhase(minutesSince: Int) -> EffectPhase? {
+        let effectPhases = [
+            EffectPhase(
+                name: "Onset",
+                timeRange: 0...45,
+                description: "Initial absorption",
+                feelings: ["Anticipation", "Subtle changes", "Alertness"],
+                color: .blue,
+                icon: "timer"
+            ),
+            EffectPhase(
+                name: "Come-up",
+                timeRange: 45...90,
+                description: "Effects begin",
+                feelings: ["Energy", "Enhanced mood", "Excitement", "Possible anxiety"],
+                color: .purple,
+                icon: "arrow.up.circle.fill"
+            ),
+            EffectPhase(
+                name: "Peak",
+                timeRange: 90...210,
+                description: "Maximum effects",
+                feelings: ["Euphoria", "Empathy", "Enhanced senses", "Sociability"],
+                color: .pink,
+                icon: "sparkles"
+            ),
+            EffectPhase(
+                name: "Plateau",
+                timeRange: 210...300,
+                description: "Sustained effects",
+                feelings: ["Continued euphoria", "Reduced intensity", "Energy"],
+                color: .orange,
+                icon: "waveform.path.ecg"
+            ),
+            EffectPhase(
+                name: "Come-down",
+                timeRange: 300...420,
+                description: "Reducing effects",
+                feelings: ["Gentle decline", "Less energy", "Relaxation"],
+                color: .yellow,
+                icon: "arrow.down.circle.fill"
+            ),
+            EffectPhase(
+                name: "After-effects",
+                timeRange: 420...1440,
+                description: "Recovery beginning",
+                feelings: ["Fatigue", "Reflective", "Rest needed"],
+                color: .gray,
+                icon: "bed.double.fill"
+            )
+        ]
+        
+        return effectPhases.first(where: { phase in
+            minutesSince >= phase.timeRange.lowerBound && minutesSince <= phase.timeRange.upperBound
+        })
     }
     
-    func getPhaseColor(daysSince: Int) -> Color {
-        if daysSince < 7 {
-            return Color.orange
-        } else if daysSince < 30 {
-            return Color.yellow
-        } else if daysSince < 90 {
-            return Color.blue
+    func formatTimeInterval(minutes: Int) -> String {
+        let hours = minutes / 60
+        let mins = minutes % 60
+        
+        if hours > 0 {
+            return String(format: "%dh %02dm", hours, mins)
         } else {
-            return Color.green
+            return String(format: "%d min", mins)
         }
     }
 }
 
-// MARK: - Missing Components Added Here
+// MARK: - Metric Teaser Card
+struct MetricTeaserCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.system(.title3, design: .rounded))
+                .fontWeight(.bold)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
 
+// MARK: - Glass Card Component
+struct GlassCard<Content: View>: View {
+    @Environment(\.colorScheme) var colorScheme
+    var content: Content
+    
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    var body: some View {
+        content
+            .padding()
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(colorScheme == .dark ? 
+                              Color.white.opacity(0.07) : 
+                              Color.white.opacity(0.9))
+                    
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(
+                            colorScheme == .dark ?
+                            Color.white.opacity(0.1) :
+                            Color.black.opacity(0.05),
+                            lineWidth: 1
+                        )
+                }
+                .shadow(color: colorScheme == .dark ? 
+                        Color.black.opacity(0.2) : 
+                        Color.black.opacity(0.1),
+                        radius: 10, x: 0, y: 5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+// MARK: - Flow Layout for tags
+struct FlowLayout<T: Hashable, Content: View>: View {
+    enum Mode {
+        case stack
+        case scrollable
+    }
+    
+    let mode: Mode
+    let items: [T]
+    let itemSpacing: CGFloat
+    let lineSpacing: CGFloat
+    @ViewBuilder let viewForItem: (T) -> Content
+    
+    var body: some View {
+        if mode == .stack {
+            VStack(alignment: .leading, spacing: lineSpacing) {
+                ForEach(getRows(), id: \.self) { row in
+                    HStack(spacing: itemSpacing) {
+                        ForEach(row, id: \.self) { item in
+                            viewForItem(item)
+                        }
+                    }
+                }
+            }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: itemSpacing) {
+                    ForEach(items, id: \.self) { item in
+                        viewForItem(item)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func getRows() -> [[T]] {
+        var rows: [[T]] = [[]]
+        var currentRowWidth: CGFloat = 0
+        let screenWidth = UIScreen.main.bounds.width - 40 // Adjusting for container padding
+        
+        for item in items {
+            // This is a rough estimate of width, ideally we would measure the actual rendered width
+            let label = String(describing: item)
+            let estimatedWidth = CGFloat(label.count) * 10 + 40 // Rough estimate: 10pt per character + padding
+            
+            if currentRowWidth + estimatedWidth > screenWidth {
+                // Start a new row
+                rows.append([item])
+                currentRowWidth = estimatedWidth + itemSpacing
+            } else {
+                // Add to the current row
+                rows[rows.count - 1].append(item)
+                currentRowWidth += estimatedWidth + itemSpacing
+            }
+        }
+        
+        return rows
+    }
+}
+
+// MARK: - Effect Phase model
+struct EffectPhase {
+    let name: String
+    let timeRange: ClosedRange<Int> // in minutes from dosage
+    let description: String
+    let feelings: [String]
+    let color: Color
+    let icon: String
+}
+
+// MARK: - Quick Action Card
+struct QuickActionCard: View {
+    let title: String
+    let description: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 120, height: 110)
+            .padding()
+            .background(Color(UIColor.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+// MARK: - Button Style
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Recovery Timeline Component
 struct RecoveryTimelineCard: View {
     let dosages: [Dosage]
     
@@ -413,6 +768,7 @@ struct RecoveryMilestone: View {
     }
 }
 
+// MARK: - Usage Graph Component
 struct UsageGraphCard: View {
     let dosages: [Dosage]
     
@@ -491,6 +847,7 @@ struct UsageGraphCard: View {
     }
 }
 
+// MARK: - Tips Component
 struct TipsCard: View {
     var body: some View {
         VStack(alignment: .leading) {
@@ -520,40 +877,7 @@ struct TipRow: View {
     }
 }
 
-struct QuickActionCard: View {
-    let title: String
-    let description: String
-    let icon: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                    
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(width: 140, height: 120)
-            .padding()
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-}
-
-// Calendar extension for date calculations
+// MARK: - Calendar Extensions
 extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         let components = dateComponents([.year, .month], from: date)
@@ -568,7 +892,7 @@ extension Calendar {
     }
 }
 
-// Color extension helper
+// MARK: - Color Extension
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -595,7 +919,7 @@ extension Color {
     }
 }
 
-// Preview provider
+// MARK: - Preview Provider
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         DashboardView()

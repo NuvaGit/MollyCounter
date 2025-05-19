@@ -1,73 +1,5 @@
 import SwiftUI
 
-struct GlassCard<Content: View>: View {
-    @Environment(\.colorScheme) var colorScheme
-    var content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
-    var body: some View {
-        content
-            .padding()
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(colorScheme == .dark ? 
-                              Color.white.opacity(0.07) : 
-                              Color.white.opacity(0.9))
-                    
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(
-                            colorScheme == .dark ?
-                            Color.white.opacity(0.1) :
-                            Color.black.opacity(0.05),
-                            lineWidth: 1
-                        )
-                }
-                .shadow(color: colorScheme == .dark ? 
-                        Color.black.opacity(0.2) : 
-                        Color.black.opacity(0.1),
-                        radius: 10, x: 0, y: 5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-
-struct ActionButton: View {
-    var title: String
-    var icon: String
-    var gradient: LinearGradient
-    var action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.headline)
-                Text(title)
-                    .fontWeight(.semibold)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(gradient)
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Color.black.opacity(0.3), 
-                    radius: 10, x: 0, y: 5)
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-}
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
 
 struct AnimatedProgressRing: View {
     let progress: Double
@@ -105,5 +37,18 @@ struct AnimatedProgressRing: View {
                 .fontWeight(.bold)
         }
         .frame(width: size, height: size)
+    }
+}
+
+// Preview for the component
+struct AnimatedProgressRing_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(spacing: 30) {
+            AnimatedProgressRing(progress: 0.35, size: 100, colors: [.blue, .purple])
+            AnimatedProgressRing(progress: 0.75, size: 100, colors: [.orange, .red])
+            AnimatedProgressRing(progress: 1.0, size: 100, colors: [.green, .blue])
+        }
+        .padding()
+        .previewLayout(.sizeThatFits)
     }
 }
