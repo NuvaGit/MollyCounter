@@ -10,6 +10,17 @@ struct SettingsView: View {
     @State private var showingResetAlert = false
     @EnvironmentObject var dosageStore: DosageStore
     
+    // MDMA-specific symptoms (same list as in CheckInView)
+    let possibleSymptoms = [
+        "Jaw clenching", "Eye wiggles", "Increased energy", 
+        "Euphoria", "Enhanced touch", "Sweating", 
+        "Thirst", "Increased heartrate", "Anxiety",
+        "Enhanced music", "Talkativeness", "Empathy",
+        "Body warmth", "Heightened senses", "Love feelings",
+        "Light sensitivity", "Blurry vision", "Dizziness",
+        "Headache", "Nausea", "Cold extremities"
+    ]
+    
     var body: some View {
         NavigationView {
             List {
@@ -104,6 +115,26 @@ struct SettingsView: View {
                         } icon: {
                             Image(systemName: "pills.fill")
                                 .foregroundColor(.green)
+                        }
+                    }
+                    
+                    // NEW: Symptom Guide navigation link
+                    NavigationLink(destination: SymptomInfoListView(possibleSymptoms: possibleSymptoms)) {
+                        Label {
+                            Text("Symptom Guide")
+                        } icon: {
+                            Image(systemName: "waveform.path.ecg.rectangle.fill")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    // NEW: Effects Visualizer link
+                    NavigationLink(destination: MDMAEffectsVisualizer()) {
+                        Label {
+                            Text("Effects Visualizer")
+                        } icon: {
+                            Image(systemName: "figure.dance")
+                                .foregroundColor(.pink)
                         }
                     }
                 }

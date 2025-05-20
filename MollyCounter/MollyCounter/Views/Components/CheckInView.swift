@@ -6,6 +6,7 @@ struct CheckInView: View {
     @State private var newCheckIn: CheckIn
     @State private var selectedSymptoms: Set<String> = []
     @State private var showingAlert = false
+    @State private var selectedSymptomForAdvice: String? = nil
     
     let dosage: Dosage
     let minutesSince: Int
@@ -56,41 +57,38 @@ struct CheckInView: View {
                     }
                 }
                 
-                Section(header: Text("Current Effects")) {
+                Section(header: HStack {
+                    Text("Current Effects")
+                    Spacer()
+                    NavigationLink(destination: SymptomInfoListView(possibleSymptoms: possibleSymptoms)) {
+                        HStack {
+                            Image(systemName: "info.circle")
+                            Text("All Symptoms")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    }
+                }) {
                     // Create a grid-like layout using LazyVGrid
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible())
                     ], spacing: 10) {
                         ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
-                            Button(action: {
-                                if selectedSymptoms.contains(symptom) {
-                                    selectedSymptoms.remove(symptom)
-                                } else {
-                                    selectedSymptoms.insert(symptom)
-                                }
-                            }) {
-                                HStack {
+                            SymptomSelectionRow(
+                                symptom: symptom,
+                                isSelected: selectedSymptoms.contains(symptom),
+                                onToggle: {
                                     if selectedSymptoms.contains(symptom) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
+                                        selectedSymptoms.remove(symptom)
                                     } else {
-                                        Image(systemName: "circle")
-                                            .foregroundColor(.gray)
+                                        selectedSymptoms.insert(symptom)
                                     }
-                                    
-                                    Text(symptom)
-                                        .font(.caption)
+                                },
+                                onAdvice: {
+                                    selectedSymptomForAdvice = symptom
                                 }
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(selectedSymptoms.contains(symptom) ? 
-                                              Color.green.opacity(0.1) : Color.gray.opacity(0.1))
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                            )
                         }
                     }
                     .padding(.vertical, 8)
@@ -155,6 +153,11 @@ struct CheckInView: View {
             } message: {
                 Text("Your check-in has been recorded. Stay safe and enjoy your experience.")
             }
+            .sheet(item: $selectedSymptomForAdvice) { symptom in
+                NavigationView {
+                    SymptomAdviceView(symptom: symptom)
+                }
+            }
         }
     }
     
@@ -214,6 +217,78 @@ struct CheckInView: View {
         return effectPhases.first(where: { phase in
             minutesSince >= phase.timeRange.lowerBound && minutesSince <= phase.timeRange.upperBound
         })
+    }
+}
+
+// New component for symptom selection row with advice button
+struct SymptomSelectionRow: View {
+    let symptom: String
+    let isSelected: Bool
+    let onToggle: () -> Void
+    let onAdvice: () -> Void
+    
+    var body: some View {
+        HStack {
+            Button(action: onToggle) {
+                HStack {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    } else {
+                        Image(systemName: "circle")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Text(symptom)
+                        .font(.caption)
+                    
+                    Spacer()
+                }
+            }
+            
+            Button(action: onAdvice) {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+            }
+            .buttonStyle(BorderlessButtonStyle())
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? 
+                      Color.green.opacity(0.1) : Color.gray.opacity(0.1))
+        )
+    }
+}
+
+// New view to show a list of all symptoms with advice
+struct SymptomInfoListView: View {
+    let possibleSymptoms: [String]
+    
+    var body: some View {
+        List {
+            ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
+                NavigationLink(destination: SymptomAdviceView(symptom: symptom)) {
+                    HStack {
+                        Text(symptom)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+        .navigationTitle("All Symptoms")
+    }
+}
+
+// Make String identifiable to use with sheet(item:)
+extension String: Identifiable {
+    public var id: String {
+        return self
     }
 }
 
