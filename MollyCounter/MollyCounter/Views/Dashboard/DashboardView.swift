@@ -4,7 +4,9 @@ import Charts
 struct DashboardView: View {
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var dosageStore: DosageStore
+    @EnvironmentObject var tabSelection: TabSelection
     @State private var showingEmergencySheet = false
+    @State private var showingCheckInSheet = false
     @State private var animateCards = false
     @State private var timeNow = Date()
     @State private var pulseSize: CGFloat = 1.0
@@ -36,7 +38,13 @@ struct DashboardView: View {
                                 .padding(.top, 30)
                         }
                         
-                        // NEW: MDMA State Human Figure Animation
+                        // NEW: Check-In Section for active sessions
+                        if let lastDosage = dosageStore.dosages.last, isRecentDosage() {
+                            checkInSection()
+                                .padding(.top, 10)
+                        }
+                        
+                        // MDMA State Human Figure Animation
                         if let _ = dosageStore.dosages.last, isRecentDosage() {
                             mdmaStateView()
                                 .offset(y: animateCards ? 0 : 60)
@@ -114,6 +122,12 @@ struct DashboardView: View {
                 .sheet(isPresented: $showingEmergencySheet) {
                     EmergencyContactView()
                 }
+                .sheet(isPresented: $showingCheckInSheet) {
+                    if let lastDosage = dosageStore.dosages.last {
+                        let minutesSince = Int(timeNow.timeIntervalSince(lastDosage.date) / 60)
+                        CheckInView(dosage: lastDosage, minutesSince: minutesSince)
+                    }
+                }
             }
         }
         .onAppear {
@@ -125,6 +139,96 @@ struct DashboardView: View {
         }
         .onReceive(timer) { _ in
             timeNow = Date()
+        }
+    }
+    
+    // MARK: - Check-In Section
+    
+    @ViewBuilder
+    func checkInSection() -> some View {
+        if let lastDosage = dosageStore.dosages.last, isRecentDosage() {
+            let minutesSince = Int(timeNow.timeIntervalSince(lastDosage.date) / 60)
+            
+            VStack(alignment: .leading, spacing: 15) {
+                HStack {
+                    Text("How are you feeling?")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    // Show last check-in time if available
+                    if let lastCheckIn = dosageStore.getCheckIns(forDosage: lastDosage.id).last {
+                        let checkInMinutesAgo = Int(timeNow.timeIntervalSince(lastCheckIn.timestamp) / 60)
+                        Text("Last: \(checkInMinutesAgo) min ago")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                    }
+                }
+                
+                Button(action: {
+                    self.showingCheckInSheet = true
+                }) {
+                    HStack(spacing: 15) {
+                        Image(systemName: "waveform.path.ecg")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                        
+                        Text("Record How You Feel Now")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 20)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.blue, Color.purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: Color.blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .padding(.horizontal)
+                
+                // Show latest check-in symptoms if available
+                if let lastCheckIn = dosageStore.getCheckIns(forDosage: lastDosage.id).last,
+                   !lastCheckIn.symptoms.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current effects you're experiencing:")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(lastCheckIn.symptoms.sorted(), id: \.self) { symptom in
+                                    Text(symptom)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue.opacity(0.15))
+                                        .foregroundColor(.blue)
+                                        .cornerRadius(12)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+            }
+            .offset(y: animateCards ? 0 : 65)
+            .opacity(animateCards ? 1 : 0)
         }
     }
     
@@ -499,6 +603,7 @@ struct DashboardView: View {
             
             Button(action: {
                 // Navigate to log tab
+                tabSelection.selectedTab = 1 // Index of the Log tab
             }) {
                 Text("Add Record")
                     .font(.system(.subheadline, design: .rounded))
@@ -562,7 +667,9 @@ struct DashboardView: View {
                         description: "Record MDMA use",
                         icon: "plus.circle.fill",
                         color: .blue,
-                        action: {}
+                        action: {
+                            tabSelection.selectedTab = 1 // Navigate to Log tab
+                        }
                     )
                     
                     QuickActionCard(
@@ -580,7 +687,9 @@ struct DashboardView: View {
                         description: "Safe dosage info",
                         icon: "function",
                         color: .purple,
-                        action: {}
+                        action: {
+                            // We could navigate to the calculator here in the future
+                        }
                     )
                     
                     QuickActionCard(
@@ -588,7 +697,9 @@ struct DashboardView: View {
                         description: "View past records",
                         icon: "clock.fill",
                         color: .orange,
-                        action: {}
+                        action: {
+                            tabSelection.selectedTab = 2 // Navigate to History tab
+                        }
                     )
                 }
                 .padding(.horizontal)

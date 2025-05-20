@@ -6,17 +6,21 @@ struct LogEntryView: View {
     @State private var showingAlert = false
     @State private var showEnvironment = false
     @State private var environment = "Home"
-    @State private var selectedSymptoms: Set<String> = []
+    @State private var selectedSupplements: Set<String> = []
     
-    // MDMA-specific symptoms to track
-    let possibleSymptoms = [
-        "Jaw clenching", "Eye wiggles", "Increased energy", 
-        "Euphoria", "Enhanced touch", "Sweating", 
-        "Thirst", "Increased heartrate", "Anxiety"
-    ]
-    
-    // MDMA-specific environments
+    // MDMA environments
     let environments = ["Home", "Club", "Festival", "Party", "Concert", "Nature", "Other"]
+    
+    // MDMA-specific supplements
+    let possibleSupplements = [
+        "Magnesium (reduces jaw clenching)",
+        "Vitamin C (antioxidant)",
+        "ALA (Alpha Lipoic Acid)",
+        "CoQ10 (heart health)",
+        "EGCG (Green tea extract)",
+        "5-HTP (for recovery, 24h+ after)",
+        "Melatonin (for sleep after)"
+    ]
     
     var body: some View {
         NavigationView {
@@ -56,9 +60,9 @@ struct LogEntryView: View {
                     Toggle("With trusted friends?", isOn: $showEnvironment)
                 }
                 
-                Section(header: Text("Health tracking")) {
+                Section(header: Text("Initial Preparation")) {
                     HStack {
-                        Text("Water consumed (glasses)")
+                        Text("Water prepared (glasses)")
                         Spacer()
                         TextField("0", value: $newDosage.waterConsumed, format: .number)
                             .keyboardType(.numberPad)
@@ -66,7 +70,7 @@ struct LogEntryView: View {
                     }
                     
                     VStack(alignment: .leading) {
-                        Text("How did you feel? (1-5)")
+                        Text("Expectation (1-5)")
                         HStack {
                             ForEach(1...5, id: \.self) { score in
                                 Button(action: {
@@ -81,19 +85,19 @@ struct LogEntryView: View {
                     }
                 }
                 
-                Section(header: Text("MDMA Effects")) {
-                    ForEach(possibleSymptoms.sorted(), id: \.self) { symptom in
+                Section(header: Text("Pre-Loading Supplements")) {
+                    ForEach(possibleSupplements.sorted(), id: \.self) { supplement in
                         Button(action: {
-                            if selectedSymptoms.contains(symptom) {
-                                selectedSymptoms.remove(symptom)
+                            if selectedSupplements.contains(supplement) {
+                                selectedSupplements.remove(supplement)
                             } else {
-                                selectedSymptoms.insert(symptom)
+                                selectedSupplements.insert(supplement)
                             }
                         }) {
                             HStack {
-                                Text(symptom)
+                                Text(supplement)
                                 Spacer()
-                                if selectedSymptoms.contains(symptom) {
+                                if selectedSupplements.contains(supplement) {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(.green)
                                 }
@@ -103,13 +107,6 @@ struct LogEntryView: View {
                     }
                 }
                 
-                Section(header: Text("Supplement Checklist")) {
-                    SupplementCheckView(name: "Magnesium (reduces jaw clenching)")
-                    SupplementCheckView(name: "Vitamin C (antioxidant)")
-                    SupplementCheckView(name: "ALA (Alpha Lipoic Acid)")
-                    SupplementCheckView(name: "CoQ10 (heart health)")
-                }
-                
                 Section(header: Text("Notes")) {
                     TextEditor(text: $newDosage.notes)
                         .frame(height: 100)
@@ -117,8 +114,8 @@ struct LogEntryView: View {
                 
                 Section {
                     Button(action: {
-                        // Store selected symptoms
-                        newDosage.symptoms = Array(selectedSymptoms)
+                        // Store selected supplements
+                        newDosage.supplements = Array(selectedSupplements)
                         newDosage.location = environment
                         
                         dosageStore.addDosage(newDosage)
@@ -126,7 +123,7 @@ struct LogEntryView: View {
                         
                         // Reset form
                         newDosage = Dosage.sampleDosage
-                        selectedSymptoms = []
+                        selectedSupplements = []
                     }) {
                         HStack {
                             Image(systemName: "square.and.pencil")
@@ -146,29 +143,8 @@ struct LogEntryView: View {
             .alert("Saved!", isPresented: $showingAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("Your MDMA usage has been recorded. Remember to stay hydrated and take breaks if dancing.")
+                Text("Your MDMA usage has been recorded. You can check in later as effects develop.")
             }
-        }
-    }
-}
-
-struct SupplementCheckView: View {
-    let name: String
-    @State private var isTaken = false
-    
-    var body: some View {
-        HStack {
-            Button(action: {
-                isTaken.toggle()
-            }) {
-                HStack {
-                    Text(name)
-                    Spacer()
-                    Image(systemName: isTaken ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isTaken ? .green : .gray)
-                }
-            }
-            .foregroundColor(.primary)
         }
     }
 }

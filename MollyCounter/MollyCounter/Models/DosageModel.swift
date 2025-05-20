@@ -6,11 +6,10 @@ struct Dosage: Identifiable, Codable {
     var date: Date
     var amount: Double // in mg
     var notes: String
-    var feelingScore: Int // 1-5 scale
-    var waterConsumed: Int // in glasses/ml
+    var feelingScore: Int // 1-5 scale - initial expectation
+    var waterConsumed: Int // in glasses/ml - initial amount
     var location: String? // Setting where MDMA was consumed
     var withFriends: Bool? // Whether with trusted friends
-    var symptoms: [String]? // MDMA symptoms experienced
     var supplements: [String]? // Supplements taken
     var purity: String? // Purity level if tested
     var userId: String? // For future multi-user support
@@ -22,10 +21,12 @@ struct Dosage: Identifiable, Codable {
 
 class DosageStore: ObservableObject {
     @Published var dosages: [Dosage] = []
+    @Published var checkIns: [CheckIn] = []
     @Published var currentUser: UserProfile? = nil
     
     init() {
         loadDosages()
+        loadCheckIns()
     }
     
     func addDosage(_ dosage: Dosage) {
@@ -47,6 +48,35 @@ class DosageStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([Dosage].self, from: data) {
             dosages = decoded
         }
+    }
+    
+    func addCheckIn(_ checkIn: CheckIn) {
+        checkIns.append(checkIn)
+        saveCheckIns()
+    }
+    
+    func saveCheckIns() {
+        if let encoded = try? JSONEncoder().encode(checkIns) {
+            UserDefaults.standard.set(encoded, forKey: "checkIns")
+        }
+    }
+    
+    func loadCheckIns() {
+        if let data = UserDefaults.standard.data(forKey: "checkIns"),
+           let decoded = try? JSONDecoder().decode([CheckIn].self, from: data) {
+            checkIns = decoded
+        }
+    }
+    
+    // Get check-ins for a specific dosage
+    func getCheckIns(forDosage dosageId: UUID) -> [CheckIn] {
+        return checkIns.filter { $0.dosageId == dosageId }
+            .sorted(by: { $0.timestamp < $1.timestamp })
+    }
+    
+    // Check if there are any check-ins for a dosage
+    func hasCheckIns(forDosage dosageId: UUID) -> Bool {
+        return checkIns.contains(where: { $0.dosageId == dosageId })
     }
     
     // Calculate safe dosage based on weight and experience

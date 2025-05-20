@@ -1,34 +1,38 @@
 import SwiftUI
 
+class TabSelection: ObservableObject {
+    @Published var selectedTab = 0
+}
+
 struct MainTabView: View {
-    @State private var selectedTab = 0
+    @StateObject private var tabSelection = TabSelection()
     
     var body: some View {
         ZStack {
-            TabView(selection: $selectedTab) {
+            TabView(selection: $tabSelection.selectedTab) {
                 DashboardView()
-                    .gesture(swipeGesture(for: selectedTab))
+                    .gesture(swipeGesture(for: tabSelection.selectedTab))
                     .tabItem {
                         Label("Dashboard", systemImage: "house.fill")
                     }
                     .tag(0)
                 
                 LogEntryView()
-                    .gesture(swipeGesture(for: selectedTab))
+                    .gesture(swipeGesture(for: tabSelection.selectedTab))
                     .tabItem {
                         Label("Log", systemImage: "plus.circle.fill")
                     }
                     .tag(1)
                 
                 HistoryView()
-                    .gesture(swipeGesture(for: selectedTab))
+                    .gesture(swipeGesture(for: tabSelection.selectedTab))
                     .tabItem {
                         Label("History", systemImage: "clock.fill")
                     }
                     .tag(2)
                 
                 SettingsView()
-                    .gesture(swipeGesture(for: selectedTab))
+                    .gesture(swipeGesture(for: tabSelection.selectedTab))
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
@@ -36,6 +40,7 @@ struct MainTabView: View {
             }
             .accentColor(.purple)
         }
+        .environmentObject(tabSelection)
     }
     
     private func swipeGesture(for tabIndex: Int) -> some Gesture {
@@ -47,7 +52,7 @@ struct MainTabView: View {
                 // If we're swiping left with enough distance
                 if gesture.translation.width < -50 && tabIndex < maxIndex {
                     withAnimation {
-                        selectedTab = tabIndex + 1
+                        tabSelection.selectedTab = tabIndex + 1
                     }
                 }
             }
@@ -58,7 +63,7 @@ struct MainTabView: View {
                 // If we're swiping right with enough distance
                 if gesture.translation.width > 50 && tabIndex > 0 {
                     withAnimation {
-                        selectedTab = tabIndex - 1
+                        tabSelection.selectedTab = tabIndex - 1
                     }
                 }
             }
